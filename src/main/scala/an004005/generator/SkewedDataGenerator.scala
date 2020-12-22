@@ -53,16 +53,4 @@ object SkewedDataGenerator extends DataGenerator {
   case class Key(key: Int)
 
   case class KeyLabel(key: Int, label: String, pass: Int)
-
-  def main(args: Array[String]): Unit = {
-    val numberOfKeys = Config.numberOfKeys
-    val keysMultiplier = Config.keysMultiplier
-    val numberOfPartitions = Config.numberOfPartitions
-
-    val spark = RunBenchMark.getLocalSpark("test")
-
-
-
-  }
-
 }

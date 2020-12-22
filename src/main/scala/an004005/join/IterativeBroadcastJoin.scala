@@ -14,6 +14,8 @@ object IterativeBroadcastJoin extends JoinStrategy {
                                      broadcast: DataFrame,
                                      iteration: Int = 0): DataFrame =
     if (iteration < Config.numberOfBroadcastPasses) {
+      spark.conf.set("spark.sql.adaptive.enabled", value = false)
+
       val tableName = s"tmp_broadcast_table_itr_$iteration.parquet"
 
       val out = result.join(

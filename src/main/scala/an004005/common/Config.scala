@@ -1,6 +1,6 @@
 package an004005.common
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 
 object Config {
   private val conf = ConfigFactory.load

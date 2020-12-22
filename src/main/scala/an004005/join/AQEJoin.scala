@@ -1,9 +1,9 @@
 package an004005.join
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-class AQEJoin extends JoinStrategy {
+object AQEJoin extends JoinStrategy {
   override def join(spark: SparkSession, dfLarge: DataFrame, dfMedium: DataFrame): DataFrame = {
-    spark.conf.set("spark.sql.adaptive.enabled", 1)
+    spark.conf.set("spark.sql.adaptive.enabled", value = true)
 
     dfLarge
       .join(
