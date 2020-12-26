@@ -14,9 +14,6 @@ object IterativeBroadcastJoin extends JoinStrategy {
                                      broadcast: DataFrame,
                                      iteration: Int = 0): DataFrame =
     if (iteration < Config.numberOfBroadcastPasses) {
-      spark.conf.set("spark.sql.adaptive.enabled", value = false)
-
-      val tableName = s"tmp_broadcast_table_itr_$iteration.parquet"
 
       val out = result.join(
         broadcast.filter(col("pass") === lit(iteration)),
@@ -32,11 +29,9 @@ object IterativeBroadcastJoin extends JoinStrategy {
         ).as("label")
       )
 
-      SparkUtil.dfWrite(out, tableName)
-
       iterativeBroadcastJoin(
         spark,
-        SparkUtil.dfRead(spark, tableName),
+        out,
         broadcast,
         iteration + 1
       )
@@ -45,6 +40,8 @@ object IterativeBroadcastJoin extends JoinStrategy {
   override def join(spark: SparkSession,
                     dfLarge: DataFrame,
                     dfMedium: DataFrame): DataFrame = {
+    spark.conf.set("spark.sql.adaptive.enabled", value = false)
+
     broadcast(dfMedium)
     iterativeBroadcastJoin(
       spark,

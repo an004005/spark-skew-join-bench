@@ -6,4 +6,6 @@ final case class IterativeBroadcastJoinType() extends JoinType
 
 final case class SortMergeJoinType() extends JoinType
 
+final case class PartialIterativeBroadcastJoinType() extends JoinType
+
 

@@ -1,8 +1,8 @@
 package an004005
 
 import an004005.common.Config
-import an004005.generator.{DataGenerator, SkewedDataGenerator}
-import an004005.join.{IterativeBroadcastJoin, IterativeBroadcastJoinType, JoinType, NormalJoin, SortMergeJoinType}
+import an004005.generator.{DataGenerator, MixedDataGenerator, SkewedDataGenerator}
+import an004005.join.{IterativeBroadcastJoin, IterativeBroadcastJoinType, JoinType, NormalJoin, PartialIterativeBroadcastJoin, PartialIterativeBroadcastJoinType, SortMergeJoinType}
 import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
@@ -51,6 +51,15 @@ object RunBenchMark extends App {
             .read
             .load(generator.getMediumTableName)
         )
+        case _: PartialIterativeBroadcastJoinType => PartialIterativeBroadcastJoin.join(
+          spark,
+          spark
+            .read
+            .load(generator.getLargeTableName),
+          spark
+            .read
+            .load(generator.getMediumTableName)
+        )
       }
 
       out.write
@@ -67,11 +76,11 @@ object RunBenchMark extends App {
                    outputTable: String = "result.parquet"): Unit = {
     val originalMultiplier = Config.keysMultiplier
 
-    (0 to iterations)
-      .map(step => originalMultiplier + (step * originalMultiplier))
-      .foreach(multiplier => { // 1000 ~ 9000
+    (1 to iterations)
+      .map(step => originalMultiplier * step)
+      .foreach(multiplier => {
 
-        val keys = Config.numberOfKeys // 100000
+        val keys = Config.numberOfKeys
         Config.keysMultiplier = multiplier
 
         // Generate uniform data and benchmark
@@ -92,27 +101,45 @@ object RunBenchMark extends App {
           outputTable
         )
 
-        Config.numberOfBroadcastPasses = 3
-
-        runTest(
-          dataGenerator,
-          new IterativeBroadcastJoinType,
-          outputTable
-        )
+//        runTest(
+//          dataGenerator,
+//          new PartialIterativeBroadcastJoinType,
+//          outputTable
+//        )
 
         runTest(
           dataGenerator,
           new SortMergeJoinType,
           outputTable
         )
+
+//        Config.numberOfBroadcastPasses = 3
+//
+//        runTest(
+//          dataGenerator,
+//          new IterativeBroadcastJoinType,
+//          outputTable
+//        )
+//
+//        runTest(
+//          dataGenerator,
+//          new PartialIterativeBroadcastJoinType,
+//          outputTable
+//        )
+//
+//        runTest(
+//          dataGenerator,
+//          new SortMergeJoinType,
+//          outputTable
+//        )
       })
 
     // Reset global Config
     Config.keysMultiplier = originalMultiplier
   }
 
-//  def getSparkSession(appName: String = "spark skew join benchmark"): SparkSession =
-//    SparkSession
+//  def getSparkSession(appName: String = "spark skew join benchmark"): SparkSession = {
+//    val spark = SparkSession
 //      .builder
 //      .appName(appName)
 //      .config("spark.master", "k8s://https://kubernetes.docker.internal:6443")
@@ -123,36 +150,44 @@ object RunBenchMark extends App {
 //      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
 //      .config("parquet.enable.dictionary", "false")
 //      .getOrCreate()
+//
+//    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+//    spark.sparkContext.setLogLevel("WARN")
+//    spark
+//  }
 
   def getSparkSession(appName: String = "spark skew join benchmark"): SparkSession = {
     val spark = SparkSession
       .builder
       .appName(appName)
-      .config("spark.master", "local[5]")
-      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-      .config("parquet.enable.dictionary", "false")
       .getOrCreate()
 
-    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+    spark.conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    spark.conf.set("parquet.enable.dictionary", "false")
     spark.sparkContext.setLogLevel("WARN")
     spark
   }
 
 
+//  def getSparkSession(appName: String = "spark skew join benchmark"): SparkSession = {
+//    val spark = SparkSession
+//      .builder
+//      .appName(appName)
+//      .config("spark.master", "local[5]")
+//      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+//      .config("parquet.enable.dictionary", "false")
+//      .getOrCreate()
+//
+//    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+//    spark.sparkContext.setLogLevel("WARN")
+//    spark
+//  }
+
+
   System.setProperty("hadoop.home.dir","D:\\hadoop-2.7.1" )
 
 
-//  runBenchmark(SkewedDataGenerator)
-  val spark = getSparkSession()
-  val data = spark
-    .read
-    .load(SkewedDataGenerator.getMediumTableName)
-  data.show(20, truncate = false)
-
-  import org.apache.spark.sql.functions._
-
-  data.withColumn("salt", (rand * 10).cast(IntegerType)).show(20, false)
-
-
+//  runBenchmark(MixedDataGenerator)
+  runBenchmark(SkewedDataGenerator)
 }
 // jar cvf my.jar an004005

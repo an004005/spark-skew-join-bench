@@ -19,6 +19,8 @@ object Config {
   // This controls the skewness
   var keysMultiplier: Int = conf.getInt("generator.multiplier") // 1000
 
+  var skewFactor: Double = conf.getDouble("generator.skewFactor")
+
   def getMediumTableName(generatorType: String): String = {
     conf.getString(s"generator.$generatorType.mediumTableName")
   }
