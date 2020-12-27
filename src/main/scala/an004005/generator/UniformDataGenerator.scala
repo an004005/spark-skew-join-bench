@@ -38,7 +38,7 @@ object UniformDataGenerator extends DataGenerator {
       .mode(SaveMode.Overwrite)
       .save(Config.getLargeTableName("uniform"))
 
-    createMediumTable(spark, Config.getMediumTableName("uniform"), numberOfPartitions)
+    createRightTable(spark, Config.getMediumTableName("uniform"), numberOfPartitions)
   }
 
   def getName: String = "UniformDataGenerator"
@@ -49,6 +49,6 @@ object UniformDataGenerator extends DataGenerator {
 
   case class Key(key: Int)
 
-  case class KeyLabel(key: Int, label: String, pass: Int)
+  case class KeyLabel(key: Int, label: String)
 
 }

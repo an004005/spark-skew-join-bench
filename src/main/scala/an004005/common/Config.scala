@@ -1,11 +1,9 @@
 package an004005.common
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import com.typesafe.config.{ConfigFactory}
 
 object Config {
   private val conf = ConfigFactory.load
-
-  var numberOfBroadcastPasses: Int = conf.getInt("broadcast.passes")
 
   var broadcastIterationTableName: String = "tmp_broadcast_table.parquet"
 
@@ -19,13 +17,15 @@ object Config {
   // This controls the skewness
   var keysMultiplier: Int = conf.getInt("generator.multiplier") // 1000
 
-  var skewFactor: Double = conf.getDouble("generator.skewFactor")
-
   def getMediumTableName(generatorType: String): String = {
-    conf.getString(s"generator.$generatorType.mediumTableName")
+    conf.getString("generator.mediumRight")
   }
 
   def getLargeTableName(generatorType: String): String = {
-    conf.getString(s"generator.$generatorType.largeTableName")
+    conf.getString("generator.largeLeft")
   }
+
+  val getLargeRightTableName: String = conf.getString("generator.largeRight")
+
+  val getRightSize: String = conf.getString("generator.rightSize")
 }

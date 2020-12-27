@@ -10,7 +10,7 @@ import org.apache.spark.storage.StorageLevel
  * skew데이터의 양이 많으면 iterative broadcast join한다.
  * 나머지 uniform데이터는 sort merge조인으로 처리한다.
  */
-object PartialIterativeBroadcastJoin extends JoinStrategy {
+object PartialBroadcastJoin extends JoinStrategy {
   import org.apache.spark.sql.functions._
 
   case class splitDataFrame(uniform: DataFrame, skew: DataFrame)
@@ -21,19 +21,24 @@ object PartialIterativeBroadcastJoin extends JoinStrategy {
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
     spark.conf.set("spark.sql.adaptive.enabled", value = false)
 
-    val isSkewTable = getIsSkewTable(dfLarge)
+    val t0 = System.nanoTime()
+    val isSkewTable = getIsSkewTable(dfLarge).union(getIsSkewTable(dfMedium)).distinct()
 
     val largePair = splitSkewAndUniform(dfLarge, isSkewTable, "large")
+
+    val mediumPair = splitSkewAndUniform(dfMedium, isSkewTable, "medium")
+    val t1 = System.nanoTime()
+    println("split Elapsed time: " + (t1 - t0) / 1000 / 1000 / 1000 + " sec")
+
     val largeUniform = SparkUtil.dfRead(spark, largePair._1)
     val largeSkew = SparkUtil.dfRead(spark, largePair._2)
 
-
-    val mediumPair = splitSkewAndUniform(dfMedium, isSkewTable, "medium")
     val mediumUniform = SparkUtil.dfRead(spark, mediumPair._1)
     val mediumSkew = SparkUtil.dfRead(spark, mediumPair._2)
 
+
     val dfUniform = NormalJoin.join(spark, largeUniform, mediumUniform)
-    val dfSkew = IterativeBroadcastJoin.join(spark, largeSkew, mediumSkew)
+    val dfSkew = BroadcastJoin.join(spark, largeSkew, mediumSkew)
 
     dfUniform.union(dfSkew)
   }
@@ -50,7 +55,7 @@ object PartialIterativeBroadcastJoin extends JoinStrategy {
       .take(1)(0).getDouble(0)
     println(s"mean key count: $keyMeanCount")
 
-    val skewFactor = Config.skewFactor
+    val skewFactor = 2
 
     val out = temp.withColumn("isSkew",
       when(col("count") >= keyMeanCount * skewFactor, true)

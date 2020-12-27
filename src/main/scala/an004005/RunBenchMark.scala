@@ -1,9 +1,8 @@
 package an004005
 
 import an004005.common.Config
-import an004005.generator.{DataGenerator, MixedDataGenerator, SkewedDataGenerator}
-import an004005.join.{IterativeBroadcastJoin, IterativeBroadcastJoinType, JoinType, NormalJoin, PartialIterativeBroadcastJoin, PartialIterativeBroadcastJoinType, SortMergeJoinType}
-import org.apache.spark.sql.types.IntegerType
+import an004005.generator.{DataGenerator, SkewedDataGenerator}
+import an004005.join.{AQEJoin, AQEJoinType, BroadcastJoin, BroadcastJoinType, JoinType, NormalJoin, PartialBroadcastJoin, PartialBroadcastJoinType, SortMergeJoinType}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 object RunBenchMark extends App {
@@ -23,7 +22,7 @@ object RunBenchMark extends App {
 
     val rows = generator.numberOfRows()
 
-    val name = s"${generator.getName}: $joinType, passes=${Config.numberOfBroadcastPasses}, keys=${Config.numberOfKeys}, multiplier=${Config.keysMultiplier}, rows=$rows"
+    val name = s"${generator.getName}: $joinType, keys=${Config.numberOfKeys}, multiplier=${Config.keysMultiplier}, rows=$rows"
 
     println(name)
 
@@ -42,7 +41,7 @@ object RunBenchMark extends App {
             .read
             .load(generator.getMediumTableName)
         )
-        case _: IterativeBroadcastJoinType => IterativeBroadcastJoin.join(
+        case _: BroadcastJoinType => BroadcastJoin.join(
           spark,
           spark
             .read
@@ -51,7 +50,16 @@ object RunBenchMark extends App {
             .read
             .load(generator.getMediumTableName)
         )
-        case _: PartialIterativeBroadcastJoinType => PartialIterativeBroadcastJoin.join(
+        case _: PartialBroadcastJoinType => PartialBroadcastJoin.join(
+          spark,
+          spark
+            .read
+            .load(generator.getLargeTableName),
+          spark
+            .read
+            .load(generator.getMediumTableName)
+        )
+        case _: AQEJoinType => AQEJoin.join(
           spark,
           spark
             .read
@@ -61,6 +69,7 @@ object RunBenchMark extends App {
             .load(generator.getMediumTableName)
         )
       }
+//      out.explain(extended = true)
 
       out.write
         .mode(SaveMode.Overwrite)
@@ -93,19 +102,17 @@ object RunBenchMark extends App {
         )
         spark.stop()
 
-        Config.numberOfBroadcastPasses = 2
+//        runTest(
+//          dataGenerator,
+//          new BroadcastJoinType,
+//          outputTable
+//        )
 
         runTest(
           dataGenerator,
-          new IterativeBroadcastJoinType,
+          new PartialBroadcastJoinType,
           outputTable
         )
-
-//        runTest(
-//          dataGenerator,
-//          new PartialIterativeBroadcastJoinType,
-//          outputTable
-//        )
 
         runTest(
           dataGenerator,
@@ -113,25 +120,13 @@ object RunBenchMark extends App {
           outputTable
         )
 
-//        Config.numberOfBroadcastPasses = 3
-//
-//        runTest(
-//          dataGenerator,
-//          new IterativeBroadcastJoinType,
-//          outputTable
-//        )
-//
-//        runTest(
-//          dataGenerator,
-//          new PartialIterativeBroadcastJoinType,
-//          outputTable
-//        )
-//
-//        runTest(
-//          dataGenerator,
-//          new SortMergeJoinType,
-//          outputTable
-//        )
+
+
+        runTest(
+          dataGenerator,
+          new AQEJoinType,
+          outputTable
+        )
       })
 
     // Reset global Config
@@ -141,47 +136,33 @@ object RunBenchMark extends App {
 //  def getSparkSession(appName: String = "spark skew join benchmark"): SparkSession = {
 //    val spark = SparkSession
 //      .builder
-//      .appName(appName)
-//      .config("spark.master", "k8s://https://kubernetes.docker.internal:6443")
-//      .config("spark.submit.deployMode", "client")
-//      .config("spark.kubernetes.container.image", "spark:0.1")
-//      .config("spark.driver.host", "192.168.35.95")
-//      .config("spark.executor.instances", "3")
 //      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
 //      .config("parquet.enable.dictionary", "false")
+//      .appName(appName)
 //      .getOrCreate()
 //
-//    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
 //    spark.sparkContext.setLogLevel("WARN")
 //    spark
 //  }
+
 
   def getSparkSession(appName: String = "spark skew join benchmark"): SparkSession = {
     val spark = SparkSession
-      .builder
-      .appName(appName)
-      .getOrCreate()
+        .builder
+        .appName(appName)
+        .config("spark.master", "local[5]")
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("parquet.enable.dictionary", "false")
+        .getOrCreate()
 
-    spark.conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    spark.conf.set("parquet.enable.dictionary", "false")
+    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+    spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "false")
+    spark.conf.set("spark.sql.adaptive.enabled", "false")
+    spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "false")
+
     spark.sparkContext.setLogLevel("WARN")
     spark
   }
-
-
-//  def getSparkSession(appName: String = "spark skew join benchmark"): SparkSession = {
-//    val spark = SparkSession
-//      .builder
-//      .appName(appName)
-//      .config("spark.master", "local[5]")
-//      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-//      .config("parquet.enable.dictionary", "false")
-//      .getOrCreate()
-//
-//    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
-//    spark.sparkContext.setLogLevel("WARN")
-//    spark
-//  }
 
 
   System.setProperty("hadoop.home.dir","D:\\hadoop-2.7.1" )

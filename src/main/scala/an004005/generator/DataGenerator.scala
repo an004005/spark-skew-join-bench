@@ -27,35 +27,44 @@ trait DataGenerator {
       ).toInt)
     ).toList
 
-  /*
-  List((0,22), (1,11), (2,7), (3,5), (4,4), (5,3), (6,3), (7,2), (8,2), (9,2), (10,2), (11,1), (12,1), (13,1), (14,1), (15,1), (16,1), (17,1), (18,1), (19,1), (20,1), (21,1), (22,0))
-  가 생성되고, 0번 키가 22개, 1번 키가 11개 .... 22번 키가 0개 생성된다든 소리
-  그리고 다시 keysMultiplier를 곱해서 개수를 늘린다.
-   */
 
-  def createMediumTable(spark: SparkSession, tableName: String, numberOfPartitions: Int): Unit = {
+  def createRightTable(spark: SparkSession, tableName: String, numberOfPartitions: Int): Unit = {
 
     import spark.implicits._
 
-    val df = spark
-      .read
-      .parquet("table_large.parquet")
-      .as[Int]
-      .distinct()
-      .mapPartitions(rows => {
-        val r = new Random()
-        rows.map(key =>
-          KeyLabel(
-            key,
-            s"Description for entry $key, that can be anything",
-            // Already preallocate the pass of the broadcast iteration here
-            Math.floor(r.nextDouble() * Config.numberOfBroadcastPasses).toInt
+    val df = Config.getRightSize match {
+      case "medium" => spark
+        .read
+        .parquet("table_large_left.parquet")
+        .as[Int]
+        .distinct()
+        .mapPartitions(rows => {
+          rows.map(key =>
+            KeyLabel(
+              key,
+              s"Description for entry $key, that can be anything"
+            )
           )
-        )
-      })
-      .repartition(numberOfPartitions)
+        })
+        .repartition(numberOfPartitions)
+      case "large" => spark
+        .read
+        .parquet("table_large_left.parquet")
+        .as[Int]
+        .mapPartitions(rows => {
+          rows.map(key =>
+            KeyLabel(
+              (key + 30) % Config.numberOfKeys,
+              s"Description for entry $key, that can be anything"
+            )
+          )
+        })
+        .repartition(numberOfPartitions)
+    }
 
-    assert(df.count() == Config.numberOfKeys)
+    println(s"$tableName right table size: ${df.count()}")
+
+//    assert(df.count() == Config.numberOfKeys)
 
     df
       .write

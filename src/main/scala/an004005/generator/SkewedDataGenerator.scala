@@ -1,6 +1,5 @@
 package an004005.generator
 
-import an004005.RunBenchMark
 import an004005.common.Config
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
@@ -26,13 +25,14 @@ object SkewedDataGenerator extends DataGenerator {
       .repartition(numberOfPartitions)
 
     assert(df.count() == numberOfRows())
+    println(s"left table size: ${df.count()}")
 
     df
       .write
       .mode(SaveMode.Overwrite)
       .save(Config.getLargeTableName("skewed"))
 
-    createMediumTable(spark, Config.getMediumTableName("skewed"), numberOfPartitions)
+    createRightTable(spark, Config.getMediumTableName("skewed"), numberOfPartitions)
   }
 
   /**
@@ -52,5 +52,5 @@ object SkewedDataGenerator extends DataGenerator {
 
   case class Key(key: Int)
 
-  case class KeyLabel(key: Int, label: String, pass: Int)
+  case class KeyLabel(key: Int, label: String)
 }
